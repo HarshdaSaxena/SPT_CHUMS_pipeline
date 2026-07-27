@@ -232,9 +232,9 @@ for field_name, label, niter, threshold in calibrators:
            specmode='mfs',
            deconvolver='hogbom',
            imsize=256,
-           cell='1arcsec',        # check this against your synthesized beam - see note below
+           cell='1arcsec',        #probably fine?? idk??
            niter=niter,
-           threshold=threshold,    # calibrators need this much higher than the target's 0.25mJy
+           threshold=threshold,    
            weighting='briggs',
            robust=0.5,
            interactive=False)
