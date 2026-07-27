@@ -50,12 +50,12 @@ flagdata(vis=vis, mode='shadow', tolerance = 0.0, flagbackup = False)
 flagdata(vis=vis, mode='quack', quackinterval=10.0, quackmode='beg', flagbackup=False)
 #flags all autocorr
 flagdata(vis=vis, autocorr=True)
-#Actual RFI flagging - unsure about what extra options to use here
+#Actual RFI flagging - looks good, default options are best for now!
 flagdata(vis=vis, mode='tfcrop', extendflags=False, action='apply', display='report', writeflags=True)
 
 #Check in plotted data if everything is well flagged 
 plotms(vis=vis, xaxis='freq', yaxis='amp', antenna='*&', flaggedsymbolshape='circle', customflaggedsymbol=True)
-#extend flagged data
+#extend flagged data - if more than 80% of time range is flagged, then flag the entire chunk
 flagdata(vis=vis, mode='extend', growtime=80.0, growfreq=80.0, action='apply', display='report', writeflags=True)
 
 #save flags version 
@@ -63,37 +63,37 @@ flagmanager(vis=vis, mode='save', versionname='flag_v2')
 
 # calibration
 
-setjy(vis=vis, field=fluxcal, scalebychan=True, standard='Perley-Butler 2010', usescratch=True)
-# do primary gain calibration - do we need bpcal or fluxcal here???
-gaincal(vis = vis, caltable = 'cal.G0', field = bpcal, refant = refant, gaintype = 'G', calmode = 'p', parang = True, solint = '60s') 
+setjy(vis=vis, field=fluxcal, scalebychan=True, standard='Stevens-Reynolds 2016', usescratch=True) #Perley-Butler 2010
+# do primary gain calibration - do we need bpcal or fluxcal here - did bpcal in first analysis. now fluxcal
+gaincal(vis = vis, caltable = 'cal.G0', field = fluxcal, refant = refant, gaintype = 'G', calmode = 'p', parang = True, solint = '60s') 
 #do bandpass response
 bandpass(vis=vis, caltable='cal.B0', field=bpcal, spw='', refant=refant, solnorm=True, solint='inf', bandtype='B', gaintable=['cal.G0'], parang=True) 
 #secondary gain calibraton??
 gaincal(vis=vis, caltable='cal.G1', field=','.join([bpcal,fluxcal,phasecal]), refant=refant, spw='*', gaintype='G', calmode='ap', parang=True, solint='45s', gaintable=['cal.B0'])
-#polarization response - do we do phasecal or fluxcal?
-polcal(vis=vis, caltable='cal.D0', field=phasecal, refant=refant, gaintable=['cal.B0', 'cal.G1'], poltype='Df+QU', solint='inf')
+#polarization response - do we do phasecal or fluxcal - did phasecal before, now fluxcal
+polcal(vis=vis, caltable='cal.D0', field=fluxcal, refant=refant, gaintable=['cal.B0', 'cal.G1'], poltype='Df+QU', solint='inf')
 
 #Need to do better solutions??? so run things again???
 bandpass(vis = vis, caltable = 'cal.B1', field = bpcal, spw='', refant = refant, solnorm = True, solint = 'inf', bandtype = 'B', gaintable = ['cal.G1','cal.D0'], parang = True)
 gaincal(vis = vis, caltable = 'cal.G2', field=','.join([bpcal,fluxcal,phasecal]), refant = refant, spw = '*', gaintype = 'G', calmode = 'ap', parang = True, solint = '45s', gaintable = ['cal.B1','cal.D0'])
-polcal(vis=vis, caltable='cal.D1', field=phasecal, refant=refant, gaintable=['cal.B1', 'cal.G2'], poltype='Df+QU', solint='inf')
+polcal(vis=vis, caltable='cal.D1', field=fluxcal, refant=refant, gaintable=['cal.B1', 'cal.G2'], poltype='Df+QU', solint='inf')
 
 #MAKE BANDPASS PLOTS
 #plotms(vis = 'cal.B1', xaxis = 'freq', yaxis = 'amp', coloraxis = 'spw') #plot the bandpass solutions
-#plotms(vis='cal.G2', xaxis='time', yaxis='amp/phase', coloraxis='spw', field=bpcal, iteraxis='antenna', plotrange=[0,0,-180.0,180.0]) 
+#plotms(vis='cal.G2', xaxis='time/freq', yaxis='amp/phase', coloraxis='spw', field=bpcal/fluxcal/phasecal, iteraxis='antenna') 
 
 #set the flux
 fluxscale(vis=vis, caltable='cal.G2', fluxtable='cal.F0', reference=fluxcal) 
 
-#apply calibration on main cals
-applycal(vis=vis, gaintable=['cal.B1', 'cal.D1', 'cal.F0'], gainfield=[bpcal, phasecal, fluxcal], field=fluxcal, parang=True, flagbackup=False)
-applycal(vis=vis, gaintable=['cal.B1', 'cal.D1', 'cal.F0'], gainfield=[bpcal, phasecal, bpcal], field=bpcal, parang=True, flagbackup=False)
-applycal(vis=vis, gaintable=['cal.B1', 'cal.D1', 'cal.F0'], gainfield=[bpcal, phasecal, bpcal], field=phasecal, parang=True, flagbackup=False)
+#apply calibration on main cals - default is linear extrapolation - can change using interp. Since D1 uses fluxcal, need fluxcal as second col, and third col is the field for self consistent solns?
+applycal(vis=vis, gaintable=['cal.B1', 'cal.D1', 'cal.F0'], gainfield=[bpcal, fluxcal, fluxcal], field=fluxcal, parang=True, flagbackup=False)
+applycal(vis=vis, gaintable=['cal.B1', 'cal.D1', 'cal.F0'], gainfield=[bpcal, fluxcal, bpcal],   field=bpcal,   parang=True, flagbackup=False)
+applycal(vis=vis, gaintable=['cal.B1', 'cal.D1', 'cal.F0'], gainfield=[bpcal, fluxcal, phasecal], field=phasecal, parang=True, flagbackup=False)
 
 # apply calibration to all targets
 
 for tgt in targets:
-    applycal(vis=vis, field=tgt, gaintable=['cal.B1', 'cal.D1', 'cal.F0'], gainfield=[bpcal, phasecal, phasecal], parang=True, flagbackup=False)
+    applycal(vis=vis, field=tgt, gaintable=['cal.B1', 'cal.D1', 'cal.F0'], gainfield=[bpcal, fluxcal, phasecal], parang=True, flagbackup=False)
 
 #the final set of flagging routines to make sure any outliers are properly flagged - change any options???
 flagmanager(vis = vis, mode = 'save', versionname = 'before_rflag')
@@ -204,21 +204,78 @@ with open(flux_results_file, 'w') as f:
         f.write(f"{tgt:<25}{flux_val:<15.8f}{flux_err:<15.8f}{status:<20}\n")
  
 
-# image only the N brightest targets using tclean 
-
-good_results = [r for r in results if r[3] == 'OK']
-good_results.sort(key=lambda r: r[1], reverse=True)
-brightest = good_results[:n_brightest_to_image]
- 
-print(f"[INFO] Imaging the {n_brightest_to_image} brightest sources:")
-for tgt, flux_val, flux_err, _ in brightest:
-    print(f"       {tgt}: {flux_val:.4f} Jy")
+# image bpcal, phasecal and fluxcal
  
 import matplotlib
 matplotlib.use('Agg')  # non-interactive backend, safe outside a GUI session - incase I need to run on a cluster
 import matplotlib.pyplot as plt
- 
-for tgt, flux_val, flux_err, _ in brightest:
+
+#Image calibrators
+calibrators = [
+    (bpcal,    'bandpass calibrator', 2000, '10mJy'),
+    (fluxcal,  'flux calibrator',     2000, '10mJy'),
+    (phasecal, 'phase calibrator',    1500, '5mJy'),
+]
+
+for field_name, label, niter, threshold in calibrators:
+    safe = field_name.replace('+', 'p').replace('-', 'm')
+    imagename = f'{safe}_cont'
+
+    for ext in ['.image', '.model', '.residual', '.psf', '.pb', '.sumwt', '.mask']:
+        if os.path.exists(imagename + ext):
+            os.system(f'rm -rf {imagename}{ext}')
+
+    tclean(vis=vis,
+           field=field_name,
+           datacolumn='corrected',
+           imagename=imagename,
+           specmode='mfs',
+           deconvolver='hogbom',
+           imsize=256,
+           cell='1arcsec',        # check this against your synthesized beam - see note below
+           niter=niter,
+           threshold=threshold,    # calibrators need this much higher than the target's 0.25mJy
+           weighting='briggs',
+           robust=0.5,
+           interactive=False)
+
+    # FITS coz we love it
+    fitsname = f'{imagename}.fits'
+    if os.path.exists(fitsname):
+        os.system(f'rm -f {fitsname}')
+    exportfits(imagename=imagename + '.image', fitsimage=fitsname, overwrite=True)
+
+    # imview/casaviewer is no longer available on macOS CASA for some reason
+    ia.open(imagename + '.image')
+    pix = ia.getchunk()[:, :, 0, 0]  # axes are [RA, Dec, Stokes, Freq] -> take a 2D slice
+    csys = ia.coordsys()
+    increment = csys.increment()['numeric']  # radians per pixel
+    ia.close()
+
+    cell_arcsec = abs(increment[0]) * 206265.0  # radians -> arcsec
+    npix = pix.shape[0]
+    half_extent = npix / 2.0 * cell_arcsec
+
+    fig, ax = plt.subplots(figsize=(6, 5))
+    im = ax.imshow(pix.T, origin='lower', cmap='inferno',
+                    extent=[-half_extent, half_extent, -half_extent, half_extent])
+    ax.invert_xaxis()  # astronomy
+    ax.set_xlabel('RA offset (arcsec)')
+    ax.set_ylabel('Dec offset (arcsec)')
+    ax.set_title(f'{field_name}  ({label})')
+    cbar = fig.colorbar(im, ax=ax)
+    cbar.set_label('Jy/beam')
+    fig.tight_layout()
+    fig.savefig(f'{imagename}.png', dpi=150)
+    plt.close(fig)
+
+    print(f"[INFO] Saved {field_name} -> {imagename}.png")
+
+print("[DONE] Calibrator imaging complete.")
+
+#Image sources 
+
+for tgt, flux_val, flux_err, _ in targets[0]:
     safe = tgt.replace('+', 'p').replace('-', 'm')
     imagename = f'{safe}_cont'
  
@@ -232,10 +289,10 @@ for tgt, flux_val, flux_err, _ in brightest:
            imagename=imagename,
            specmode='mfs',
            deconvolver='hogbom',
-           imsize=512,
-           cell='0.3arcsec',        #not sure what goes here
+           imsize=256,
+           cell='1arcsec',        #not sure what goes here
            niter=1000,
-           threshold='1mJy',         #is this 50 uJy?
+           threshold='0.25mJy',         #probably 250 uJy for now?
            weighting='briggs',
            robust=0.5,
            interactive=False)
